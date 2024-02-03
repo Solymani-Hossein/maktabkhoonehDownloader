@@ -14,12 +14,12 @@ import (
 
 type Course struct {
 	Name    string
-	Seasons []map[int]Season
+	Seasons []Season
 }
 
 type Season struct {
-	Titles []map[int]string
-	Links  []map[string]string
+	Title string
+	Links []map[string]string
 }
 
 func main() {
@@ -49,44 +49,48 @@ func main() {
 	})
 
 	// iterating over the list of pagination links to implement the crawling logic
+	//
+	// main of page element
 	mainElement := ".w-full.md\\:mt-20"
+	// name of course element
 	seasonHeadElement := ".course-page__title"
+	// title of evry season element
 	titleElement := ".base-chapter__title"
+	//main of season element
 	seasonMainElement := ".first\\:rounded-t:nth-child(%d) .p-10"
 
 	c.OnHTML(mainElement, func(e *colly.HTMLElement) {
 
 		var season Season
 
+		//get course name
 		courseName := e.ChildText(seasonHeadElement)
 		course.Name = courseName
 
-		e.ForEachWithBreak(titleElement, func(i int, h *colly.HTMLElement) bool {
+		// loop in title of season
+		e.ForEachWithBreak(titleElement, func(index int, h *colly.HTMLElement) bool {
+			currentIndex := index + 1
+			season.Title = h.Text
 
-			season.Titles = append(season.Titles, map[int]string{
-				i + 1: h.Text,
-			})
-
-			seasonMain := fmt.Sprintf(seasonMainElement, i+1)
+			seasonMain := fmt.Sprintf(seasonMainElement, currentIndex)
 			e.ForEachWithBreak(seasonMain, func(x int, j *colly.HTMLElement) bool {
+				title := j.ChildAttr("span.text-blue", "title")
+				link := j.Attr("href")
 
-				season.Links = append(season.Links, map[string]string{
-					j.Text: j.Attr("href"),
-				})
+				if title != "" {
+					season.Links = append(season.Links, map[string]string{
+						"title": title,
+						"link":  link,
+					})
+				}
 				return true
 			})
-			course.Seasons = append(course.Seasons, map[int]Season{
-				i + 1: season,
-			})
+			course.Seasons = append(course.Seasons, season)
 			return true
 		})
 
 	})
 
-	fmt.Println("course Name:", course.Name)
-	for _, data := range course.Seasons {
-		fmt.Println(data)
-	}
 	// visiting the first page
 	err := c.Visit(urls)
 	c.Wait()
@@ -96,7 +100,7 @@ func main() {
 	}
 
 	// opening the CSV file
-	file, err := os.Create("products.csv")
+	file, err := os.Create(fmt.Sprintf("%s.csv", course.Name))
 
 	if err != nil {
 		log.Fatalln("Failed to create output CSV file", err)
@@ -108,19 +112,23 @@ func main() {
 	writer := csv.NewWriter(file)
 
 	// writing the CSV headers
-	//headers := []string{}
+	headers := []string{}
 
-	//for _, data := range  {
-	//	headers = append(headers, data.title)
-	//}
+	for _, season := range course.Seasons {
+		headers = append(headers, season.Title)
+		for _, subTitle := range season.Links {
+			fmt.Println(subTitle["title"])
+			fmt.Println(subTitle["link"])
+			fmt.Println("==================================================")
+		}
+	}
 
-	//writer.Write(headers)
+	writer.Write(headers)
 
-	// writing each Pokemon product as a CSV row
-	//for _, data := range dataStructures {
-	//	for _, sub := range data.subtitle {
+	//for _, data := range course.Seasons {
+	//	for i, sub := range data.Links {
 	//		subtitles := []string{
-	//			sub,
+	//			sub[i],
 	//		}
 	//		writer.Write(subtitles)
 	//	}
